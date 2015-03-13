@@ -59,6 +59,15 @@ class Card(object):
         if statedir:
             self.state_file = statedir.join('%s.json' % card_data['id'])
 
+    @property
+    def state(self):
+        try:
+            with self.state_file.open() as handle:
+                return json.load(handle)
+
+        except py.error.ENOENT:
+            return None
+
 
 def main():
     args = parser.parse_args()
@@ -86,6 +95,7 @@ def main():
     for card_data in trello_data['cards']:
         cards_log.debug("Card %s", card_data['name'])
         card = Card(card_data, args.statedir)
+        card.state
 
 if __name__ == '__main__':
     main()
