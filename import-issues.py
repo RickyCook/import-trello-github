@@ -4,6 +4,8 @@ import json
 import logging
 import sys
 
+import py.path
+
 LOG_LEVELS = {logging.getLevelName(level): level for level in (
     logging.DEBUG,
     logging.INFO,
@@ -20,6 +22,13 @@ class LogLevelAction(argparse.Action):
     def __call__(self, parser, namespace, value, option_string=None):
         setattr(namespace, self.dest, LOG_LEVELS[value])
 
+class PyPathLocalAction(argparse.Action):
+    """
+    Create a py.path.local object
+    """
+    def __call__(self, parser, namespace, value, option_string=None):
+        setattr(namespace, self.dest, py.path.local(value))
+
 parser = argparse.ArgumentParser(
     description="Import Trello cards JSON into GitHub issues"
 )
@@ -28,7 +37,10 @@ parser.add_argument("--loglevel", choices=LOG_LEVELS.keys(),
                     action=LogLevelAction, default=logging.INFO,
                     help="Set the minimum level to show logs for")
 
-parser.add_argument("trello_json",
+parser.add_argument("--statedir", action=PyPathLocalAction,
+                    help="Directory to store change state")
+
+parser.add_argument("trello_json", action=PyPathLocalAction,
                     help="JSON file exported from Trello")
 parser.add_argument("github_owner",
                     help="Owner of the GitHub repo")
@@ -44,12 +56,19 @@ def main():
         stream=sys.stderr,
     )
 
-    with open(args.trello_json) as handle:
+    with args.trello_json.open() as handle:
         trello_data = json.load(handle)
 
     logging.info("Importing from %s (%s)",
                  trello_data.get('name', "Unknown Trello name"),
                  trello_data.get('url', "Unknown URL"))
+
+    if args.statedir:
+        args.statedir.ensure_dir()
+        logging.debug("Saving state")
+
+    cards_log = logging.getLogger("cards import")
+    cards_log.info("Importing %d cards", len(trello_data['cards']))
 
 if __name__ == '__main__':
     main()
