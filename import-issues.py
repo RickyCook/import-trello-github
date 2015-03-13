@@ -14,6 +14,7 @@ LOG_LEVELS = {logging.getLevelName(level): level for level in (
     logging.CRITICAL
 )}
 
+
 class LogLevelAction(argparse.Action):
     """
     Transform a log level name into a log level using LOG_LEVELS constant as a
@@ -22,12 +23,14 @@ class LogLevelAction(argparse.Action):
     def __call__(self, parser, namespace, value, option_string=None):
         setattr(namespace, self.dest, LOG_LEVELS[value])
 
+
 class PyPathLocalAction(argparse.Action):
     """
     Create a py.path.local object
     """
     def __call__(self, parser, namespace, value, option_string=None):
         setattr(namespace, self.dest, py.path.local(value))
+
 
 parser = argparse.ArgumentParser(
     description="Import Trello cards JSON into GitHub issues"
@@ -46,6 +49,16 @@ parser.add_argument("github_owner",
                     help="Owner of the GitHub repo")
 parser.add_argument("github_repo",
                     help="Repo in GitHub")
+
+
+class Card(object):
+    def __init__(self, card_data, statedir=None):
+        self.card_data = card_data
+        self.state_file = None
+
+        if statedir:
+            self.state_file = statedir.join('%s.json' % card_data['id'])
+
 
 def main():
     args = parser.parse_args()
@@ -69,6 +82,10 @@ def main():
 
     cards_log = logging.getLogger("cards import")
     cards_log.info("Importing %d cards", len(trello_data['cards']))
+
+    for card_data in trello_data['cards']:
+        cards_log.debug("Card %s", card_data['name'])
+        card = Card(card_data, args.statedir)
 
 if __name__ == '__main__':
     main()
