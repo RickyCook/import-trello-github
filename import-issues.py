@@ -15,6 +15,19 @@ LOG_LEVELS = {logging.getLevelName(level): level for level in (
     logging.CRITICAL
 )}
 
+LABEL_COLORS = {
+    'green': '70B500',
+    'yellow': 'F2D600',
+    'orange': 'FF9F1A',
+    'red': 'EB5A46',
+    'purple': 'C377E0',
+    'blue': '0079BF',
+    'sky': '00C2E0',
+    'lime': '51E898',
+    'pink': 'FF78CB',
+    'black': '4D4D4D',
+}
+
 
 class LogLevelAction(argparse.Action):
     """
@@ -166,6 +179,35 @@ def main():
     if args.statedir:
         args.statedir.ensure_dir()
         logging.debug("Saving state")
+
+    labels_log = logging.getLogger("labels import")
+    req = gh_request('repos/%s/%s/labels' % (args.github_owner,
+                                             args.github_repo),
+                     args)
+    if not req:
+        sys.exit(1)
+
+    for label_color, label_name in trello_data['labelNames'].items():
+        if label_name == '':
+            continue
+
+        for github_label in req.json():
+            if github_label['name'] == label_name:
+                labels_log.debug("Already have label %s", label_name)
+                break
+
+        else:
+            labels_log.info("Creating label %s", label_name)
+            label_req = gh_request(
+                'repos/%s/%s/labels' % (args.github_owner,
+                                        args.github_repo),
+                 args,
+                 data={'name': label_name,
+                       'color': LABEL_COLORS[label_color]
+                       },
+            )
+            if not label_req:
+                sys.exit(1)
 
     cards_log = logging.getLogger("cards import")
     cards_log.info("Importing %d cards", len(trello_data['cards']))
