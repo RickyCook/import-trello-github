@@ -85,7 +85,8 @@ def dict_merge_arrays(left, right):
 
 
 class LabelsMapper(object):
-    def __init__(self, args):
+    def __init__(self, trello_data, args):
+        self.trello_data = trello_data
         self.args = args
         self._labelmaps = None
 
@@ -106,24 +107,38 @@ class LabelsMapper(object):
 
     def args_for(self, card_data):
         ret = {}
-        label_mappings = self.labelmaps.get('labels', {})
+
+        try:
+            card_list_name = next(list_data['name']
+                                  for list_data in self.trello_data['lists']
+                                  if list_data['id'] == card_data['idList'])
+
+            self._apply_mappings_for(ret, card_list_name, 'lists')
+
+        except KeyError:
+            pass
+
         if card_data['labels']:
             for label_data in card_data['labels']:
-                for map_type in ('label',):
-                    try:
-                        mappings = label_mappings[label_data['name']]
-                        dict_merge_arrays(ret, self._arg_for_mapping(
-                            map_type, mappings[map_type]
-                        ))
-                        break
-
-                    except KeyError:
-                        pass
-
-                else:
-                    dict_merge_arrays(ret, {'labels': [label_data['name']]})
+                self._apply_mappings_for(ret, label_data['name'], 'labels')
 
         return ret
+
+    def _apply_mappings_for(self, ret, value, map_from_type):
+        from_type_mappings = self.labelmaps.get(map_from_type, {})
+        for map_to_type in ('label',):
+            try:
+                mappings = from_type_mappings[value]
+                dict_merge_arrays(ret, self._arg_for_mapping(
+                    map_to_type, mappings[map_to_type]
+                ))
+                break
+
+            except KeyError:
+                pass
+
+        else:
+            dict_merge_arrays(ret, {'labels': [label_data['name']]})
 
     def _arg_for_mapping(self, map_type, name):
         if map_type == 'label':
@@ -288,7 +303,7 @@ def main():
         "Importing as GitHub user %s",
         req.json().get('name', "unknown user name")
     )
-    labels_mapper = LabelsMapper(args)
+    labels_mapper = LabelsMapper(trello_data, args)
 
     for card_data in trello_data['cards']:
         cards_log.debug("Card %s", card_data['name'])
