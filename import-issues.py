@@ -336,7 +336,8 @@ def main():
         cards_log.debug("Card %s", card_data['name'])
         card = Card(card_data, args, labels_mapper)
         ok = card.save()
-        return
+        if not ok:
+            logging.error("Failed to save %s" % card_data['name'])
 
 
 if __name__ == '__main__':
