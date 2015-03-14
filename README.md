@@ -20,8 +20,9 @@ labels, or milestones as specified.
         "Really Hard": {"label": "8 points"}
     },
     "lists": {
-        "Doing": { "label": "in progress" },
-        "Next Up": { "milestone": ["alpha 4", "another"] },
+        "Doing": { "label": ["in progress", "now"] },
+        "Next Up": { "milestone": "alpha 4",
+                     "label": "some label" },
         "Beta icebox": { "milestone": "beta" }
     }
 }
