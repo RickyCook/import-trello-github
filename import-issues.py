@@ -89,6 +89,7 @@ class LabelsMapper(object):
         self.trello_data = trello_data
         self.args = args
         self._labelmaps = None
+        self._milestones = None
 
     @property
     def labelmaps(self):
@@ -104,6 +105,28 @@ class LabelsMapper(object):
                 self._labelmaps = {}
 
         return self._labelmaps
+
+    @property
+    def milestones(self):
+        if self._milestones is None:
+            req = gh_request(
+                'repos/%s/%s/milestones' % (
+                    self.args.github_owner,
+                    self.args.github_repo,
+                ),
+                self.args,
+            )
+            if not req:
+                self._milestones = {}
+
+            else:
+                self._milestones = {
+                    milestone['title']: milestone['number']
+                    for milestone in req.json()
+                }
+
+        return self._milestones
+
 
     def args_for(self, card_data):
         ret = {}
@@ -126,7 +149,7 @@ class LabelsMapper(object):
 
     def _apply_mappings_for(self, ret, value, map_from_type):
         from_type_mappings = self.labelmaps.get(map_from_type, {})
-        for map_to_type in ('label',):
+        for map_to_type in ('label', 'milestone'):
             try:
                 mappings = from_type_mappings[value]
                 dict_merge_arrays(ret, self._arg_for_mapping(
@@ -147,8 +170,12 @@ class LabelsMapper(object):
 
             return {'labels': name}
 
+        if map_type == 'milestone':
+            return {'milestone': self.milestones[name]}
+
         else:
             raise Exception("Unknown mapping type: %s" % map_type)
+
 
 class Card(object):
     def __init__(self, card_data, args, labels_mapper):
