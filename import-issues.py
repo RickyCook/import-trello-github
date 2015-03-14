@@ -138,7 +138,7 @@ class LabelsMapper(object):
                 pass
 
         else:
-            dict_merge_arrays(ret, {'labels': [label_data['name']]})
+            dict_merge_arrays(ret, {'labels': [value]})
 
     def _arg_for_mapping(self, map_type, name):
         if map_type == 'label':
