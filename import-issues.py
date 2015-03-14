@@ -59,6 +59,8 @@ parser.add_argument("--statedir", action=PyPathLocalAction,
 parser.add_argument("--githubroot",
                     default="https://api.github.com",
                     help="Root for the GitHub API")
+parser.add_argument("--labelmaps", action=PyPathLocalAction,
+                    help="Map Trello labels to GitHub labels")
 
 parser.add_argument("trello_json", action=PyPathLocalAction,
                     help="JSON file exported from Trello")
@@ -73,11 +75,72 @@ parser.add_argument("github_password",
                     help="Your GitHub password")
 
 
+def dict_merge_arrays(left, right):
+    for rkey, rval in right.items():
+        if rkey in left:
+            left[rkey] = left[rkey] + rval
+
+        else:
+            left[rkey] = rval
+
+
+class LabelsMapper(object):
+    def __init__(self, args):
+        self.args = args
+        self._labelmaps = None
+
+    @property
+    def labelmaps(self):
+        if not self.args.labelmaps:
+            self._labelmaps = {}
+
+        else:
+            try:
+                with self.args.labelmaps.open() as handle:
+                    self._labelmaps = json.load(handle)
+
+            except py.error.ENOENT:
+                self._labelmaps = {}
+
+        return self._labelmaps
+
+    def args_for(self, card_data):
+        ret = {}
+        label_mappings = self.labelmaps.get('labels', {})
+        if card_data['labels']:
+            for label_data in card_data['labels']:
+                for map_type in ('label',):
+                    try:
+                        mappings = label_mappings[label_data['name']]
+                        dict_merge_arrays(ret, self._arg_for_mapping(
+                            map_type, mappings[map_type]
+                        ))
+                        break
+
+                    except KeyError:
+                        pass
+
+                else:
+                    dict_merge_arrays(ret, {'labels': [label_data['name']]})
+
+        return ret
+
+    def _arg_for_mapping(self, map_type, name):
+        if map_type == 'label':
+            if not isinstance(name, (list, tuple)):
+                name = [name]
+
+            return {'labels': name}
+
+        else:
+            raise Exception("Unknown mapping type: %s" % map_type)
+
 class Card(object):
-    def __init__(self, card_data, args):
+    def __init__(self, card_data, args, labels_mapper):
         self.card_data = card_data
         self.state_file = None
         self.args = args
+        self.labels_mapper = labels_mapper
 
         if args.statedir:
             self.state_file = args.statedir.join('%s.json' % card_data['id'])
@@ -100,12 +163,17 @@ class Card(object):
         else:
             req_fn = None
             req_url = 'repos/%s/%s/issues' % (self.args.github_owner,
-                                              self.args.github_repo),
+                                              self.args.github_repo)
 
             state = {}
 
         state['title'] = self.card_data['name']
         state['body'] = self.card_data['desc']
+
+        state = dict(
+            list(state.items()) +
+            list(self.labels_mapper.args_for(self.card_data).items())
+        )
 
         req = gh_request(
             req_url, self.args, data=state, req_fn=req_fn,
@@ -220,10 +288,11 @@ def main():
         "Importing as GitHub user %s",
         req.json().get('name', "unknown user name")
     )
+    labels_mapper = LabelsMapper(args)
 
     for card_data in trello_data['cards']:
         cards_log.debug("Card %s", card_data['name'])
-        card = Card(card_data, args)
+        card = Card(card_data, args, labels_mapper)
         ok = card.save()
         return
 
