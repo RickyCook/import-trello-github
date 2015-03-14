@@ -5,6 +5,7 @@ import logging
 import sys
 
 import py.path
+import requests
 
 LOG_LEVELS = {logging.getLevelName(level): level for level in (
     logging.DEBUG,
@@ -42,6 +43,9 @@ parser.add_argument("--loglevel", choices=LOG_LEVELS.keys(),
 
 parser.add_argument("--statedir", action=PyPathLocalAction,
                     help="Directory to store change state")
+parser.add_argument("--githubroot",
+                    default="https://api.github.com",
+                    help="Root for the GitHub API")
 
 parser.add_argument("trello_json", action=PyPathLocalAction,
                     help="JSON file exported from Trello")
@@ -49,6 +53,11 @@ parser.add_argument("github_owner",
                     help="Owner of the GitHub repo")
 parser.add_argument("github_repo",
                     help="Repo in GitHub")
+
+parser.add_argument("github_user",
+                    help="Your GitHub username")
+parser.add_argument("github_password",
+                    help="Your GitHub password")
 
 
 class Card(object):
@@ -67,6 +76,22 @@ class Card(object):
 
         except py.error.ENOENT:
             return None
+
+
+def gh_request(path, args):
+    req = requests.get('%s/%s' % (args.githubroot, path),
+                       auth=(args.github_user, args.github_password))
+
+    if not req.ok:
+        data = req.json()
+        message = data.get(
+            'message',
+            "HTTP error %d: %s" % (req.status_code, req.reason)
+        )
+        logging.getLogger('github').error(message)
+        return False
+
+    return req
 
 
 def main():
@@ -91,6 +116,15 @@ def main():
 
     cards_log = logging.getLogger("cards import")
     cards_log.info("Importing %d cards", len(trello_data['cards']))
+
+    req = gh_request('user', args)
+    if not req:
+        sys.exit(1)
+
+    logging.info(
+        "Importing as GitHub user %s",
+        req.json().get('name', "unknown user name")
+    )
 
     for card_data in trello_data['cards']:
         cards_log.debug("Card %s", card_data['name'])
