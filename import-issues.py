@@ -149,7 +149,7 @@ class LabelsMapper(object):
 
     def _apply_mappings_for(self, ret, value, map_from_type):
         from_type_mappings = self.labelmaps.get(map_from_type, {})
-        for map_to_type in ('label', 'milestone'):
+        for map_to_type in ('label', 'milestone', 'state'):
             try:
                 mappings = from_type_mappings[value]
                 dict_merge_arrays(ret, self._arg_for_mapping(
@@ -172,6 +172,9 @@ class LabelsMapper(object):
 
         if map_type == 'milestone':
             return {'milestone': self.milestones[name]}
+
+        if map_type == 'state':
+            return {'state': name}
 
         else:
             raise Exception("Unknown mapping type: %s" % map_type)
