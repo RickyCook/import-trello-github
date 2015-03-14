@@ -61,12 +61,13 @@ parser.add_argument("github_password",
 
 
 class Card(object):
-    def __init__(self, card_data, statedir=None):
+    def __init__(self, card_data, args):
         self.card_data = card_data
         self.state_file = None
+        self.args = args
 
-        if statedir:
-            self.state_file = statedir.join('%s.json' % card_data['id'])
+        if args.statedir:
+            self.state_file = args.statedir.join('%s.json' % card_data['id'])
 
     @property
     def state(self):
@@ -77,17 +78,58 @@ class Card(object):
         except py.error.ENOENT:
             return None
 
+    def save(self):
+        state = self.state
+        if state:
+            logging.error("Not creating duplicate issue")
+            return False
 
-def gh_request(path, args):
-    req = requests.get('%s/%s' % (args.githubroot, path),
-                       auth=(args.github_user, args.github_password))
+        else:
+            state = {}
+
+        req = gh_request(
+            'repos/%s/%s/issues' % (self.args.github_owner,
+                                    self.args.github_repo),
+            self.args,
+            {'title': self.card_data['name'],
+             }
+        )
+
+        if not req:
+            return False
+
+        data = req.json()
+        state['url'] = data['url']
+
+        with self.state_file.open('w') as handle:
+            json.dump(state, handle)
+
+        return True
+
+
+def gh_request(path, args, data=None):
+    if data:
+        req_fn = requests.post
+        data = json.dumps(data)
+
+    else:
+        req_fn = requests.get
+
+    req = req_fn('%s/%s' % (args.githubroot, path),
+                 auth=(args.github_user, args.github_password),
+                 data=data)
 
     if not req.ok:
-        data = req.json()
-        message = data.get(
-            'message',
-            "HTTP error %d: %s" % (req.status_code, req.reason)
-        )
+        try:
+            data = req.json()
+            message = data.get(
+                'message',
+                "HTTP error %d: %s" % (req.status_code, req.reason)
+            )
+
+        except ValueError:
+            message = "HTTP error %d: %s" % (req.status_code, req.reason)
+
         logging.getLogger('github').error(message)
         return False
 
@@ -128,8 +170,10 @@ def main():
 
     for card_data in trello_data['cards']:
         cards_log.debug("Card %s", card_data['name'])
-        card = Card(card_data, args.statedir)
-        card.state
+        card = Card(card_data, args)
+        ok = card.save()
+        return
+
 
 if __name__ == '__main__':
     main()
