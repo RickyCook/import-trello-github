@@ -81,18 +81,21 @@ class Card(object):
     def save(self):
         state = self.state
         if state:
-            logging.error("Not creating duplicate issue")
-            return False
+            req_fn = requests.patch
+            req_url = state['url']
 
         else:
+            req_fn = None
+            req_url = 'repos/%s/%s/issues' % (self.args.github_owner,
+                                              self.args.github_repo),
+
             state = {}
 
+        state['title'] = self.card_data['name']
+        state['body'] = self.card_data['desc']
+
         req = gh_request(
-            'repos/%s/%s/issues' % (self.args.github_owner,
-                                    self.args.github_repo),
-            self.args,
-            {'title': self.card_data['name'],
-             }
+            req_url, self.args, data=state, req_fn=req_fn,
         )
 
         if not req:
@@ -107,15 +110,23 @@ class Card(object):
         return True
 
 
-def gh_request(path, args, data=None):
+def gh_request(path, args, data=None, req_fn=None):
     if data:
-        req_fn = requests.post
+        if req_fn is None:
+            req_fn = requests.post
+
         data = json.dumps(data)
 
-    else:
+    elif req_fn is None:
         req_fn = requests.get
 
-    req = req_fn('%s/%s' % (args.githubroot, path),
+    if '://' not in path:
+        req_url = '%s/%s' % (args.githubroot, path)
+
+    else:
+        req_url = path
+
+    req = req_fn(req_url,
                  auth=(args.github_user, args.github_password),
                  data=data)
 
