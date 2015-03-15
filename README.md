@@ -28,3 +28,26 @@ labels, or milestones as specified.
     }
 }
 ```
+
+## Example
+For the Trello board at https://trello.com/b/zaFPjsli/dockci
+
+**mappings.json**
+```json
+{
+    "lists": {
+        "Done": {"state": "closed" },
+        "Doing": { "label": "in progress" },
+        "Next Up": { "milestone": "alpha 4" },
+        "Beta icebox": { "milestone": "beta" }
+    }
+}
+```
+
+```
+./import-issues.py --loglevel DEBUG \
+                   --statedir state \
+                   --labelmaps mappings.json \
+                   trello.json rickycook dockci \
+                   my@email.com mypasswordhere
+```
