@@ -213,7 +213,10 @@ class Card(object):
             state = {}
 
         state['title'] = self.card_data['name']
-        state['body'] = self.card_data['desc']
+        state['body'] = "%s\n\n%s" % (
+            self.card_data['url'],
+            self.card_data['desc']
+        )
 
         state = dict(
             list(state.items()) +
