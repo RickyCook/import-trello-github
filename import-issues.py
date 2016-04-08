@@ -53,7 +53,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--loglevel", choices=LOG_LEVELS.keys(),
                     action=LogLevelAction, default=logging.INFO,
                     help="Set the minimum level to show logs for")
-
+parser.add_argument("--dryrun",
+                    help="Dryrun mode. Don't make any changes.")
 parser.add_argument("--statedir", action=PyPathLocalAction,
                     help="Directory to store change state")
 parser.add_argument("--githubroot",
@@ -90,6 +91,10 @@ class LabelsMapper(object):
         self.args = args
         self._labelmaps = None
         self._milestones = None
+
+    @property
+    def lists(self):
+        return self.labelmaps['lists']
 
     @property
     def labelmaps(self):
@@ -192,6 +197,10 @@ class Card(object):
 
     @property
     def state(self):
+
+        if not self.state_file:
+            return None
+
         try:
             with self.state_file.open() as handle:
                 return json.load(handle)
@@ -199,7 +208,7 @@ class Card(object):
         except py.error.ENOENT:
             return None
 
-    def save(self):
+    def save(self, dryrun):
         state = self.state
         if state:
             req_fn = requests.patch
@@ -223,18 +232,22 @@ class Card(object):
             list(self.labels_mapper.args_for(self.card_data).items())
         )
 
-        req = gh_request(
-            req_url, self.args, data=state, req_fn=req_fn,
-        )
+        logging.debug("making request to {0} with args {1}".format(req_url, state))
 
-        if not req:
-            return False
+        if not dryrun:
+            req = gh_request(
+                req_url, self.args, data=state, req_fn=req_fn,
+            )
 
-        data = req.json()
-        state['url'] = data['url']
+            if not req:
+                return False
 
-        with self.state_file.open('w') as handle:
-            json.dump(state, handle)
+            data = req.json()
+            state['url'] = data['url']
+
+            if self.state_file:
+                with self.state_file.open('w') as handle:
+                    json.dump(state, handle)
 
         return True
 
@@ -285,6 +298,11 @@ def main():
         stream=sys.stderr,
     )
 
+    dryrun = args.dryrun
+
+    if dryrun:
+        logging.info("dryrun mode ON")
+
     with args.trello_json.open() as handle:
         trello_data = json.load(handle)
 
@@ -313,17 +331,19 @@ def main():
                 break
 
         else:
-            labels_log.info("Creating label %s", label_name)
-            label_req = gh_request(
-                'repos/%s/%s/labels' % (args.github_owner,
-                                        args.github_repo),
-                 args,
-                 data={'name': label_name,
-                       'color': LABEL_COLORS[label_color]
-                       },
-            )
-            if not label_req:
-                sys.exit(1)
+            if not dryrun:
+                labels_log.info("Creating label %s", label_name)
+                label_req = gh_request(
+                    'repos/%s/%s/labels' % (args.github_owner,
+                                            args.github_repo),
+                     args,
+                     data={'name': label_name,
+                           'color': LABEL_COLORS[label_color]
+                           },
+                )
+                if not label_req:
+                    logging.error("label creation failed")
+                    sys.exit(1)
 
     cards_log = logging.getLogger("cards import")
     cards_log.info("Importing %d cards", len(trello_data['cards']))
@@ -341,7 +361,14 @@ def main():
     for card_data in trello_data['cards']:
         cards_log.debug("Card %s", card_data['name'])
         card = Card(card_data, args, labels_mapper)
-        ok = card.save()
+
+        list_name = [list['name'] for list in trello_data['lists'] if list['id'] == card_data["idList"]].pop()
+
+        if not labels_mapper.lists.get(list_name):
+            logging.warn("List {0}, not defined, skipping card".format(list_name))
+            continue
+
+        ok = card.save(dryrun)
         if not ok:
             logging.error("Failed to save %s" % card_data['name'])
 
