@@ -361,8 +361,12 @@ def main():
         cards_log.debug("Card %s", card_data['name'])
         card = Card(card_data, args, labels_mapper)
 
-        list_name = [list['name'] for list in trello_data['lists'] if list['id'] == card_data["idList"]].pop()
-
+        list_name = next((
+            list['name']
+            for list in trello_data['lists']
+            if list['id'] == card_data["idList"]
+        ))
+        
         if not labels_mapper.lists.get(list_name):
             logging.warn("List {0}, not defined, skipping card".format(list_name))
             continue
