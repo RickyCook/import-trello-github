@@ -330,8 +330,8 @@ def main():
                 break
 
         else:
+            labels_log.info("Creating label %s", label_name)
             if not dryrun:
-                labels_log.info("Creating label %s", label_name)
                 label_req = gh_request(
                     'repos/%s/%s/labels' % (args.github_owner,
                                             args.github_repo),
