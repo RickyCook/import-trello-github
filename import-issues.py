@@ -197,7 +197,6 @@ class Card(object):
 
     @property
     def state(self):
-
         if not self.state_file:
             return None
 
