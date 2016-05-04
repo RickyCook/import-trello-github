@@ -225,6 +225,8 @@ class Card(object):
             self.card_data['url'],
             self.card_data['desc']
         )
+        if self.card_data['closed'] == True:
+            state['state'] = 'closed' 
 
         state = dict(
             list(state.items()) +
