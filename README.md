@@ -51,3 +51,5 @@ For the Trello board at https://trello.com/b/zaFPjsli/dockci
                    trello.json rickycook dockci \
                    my@email.com mypasswordhere
 ```
+
+The `--statedir` flag is recommended to allow recovery in case GitHub's abuse detection is triggered (see #5). If this happens, rerun the command with the same `--statedir` value as before.
