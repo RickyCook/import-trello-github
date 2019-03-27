@@ -62,7 +62,6 @@ parser.add_argument("--githubroot",
                     help="Root for the GitHub API")
 parser.add_argument("--labelmaps", action=PyPathLocalAction,
                     help="Map Trello labels to GitHub labels")
-
 parser.add_argument("trello_json", action=PyPathLocalAction,
                     help="JSON file exported from Trello")
 parser.add_argument("github_owner",
@@ -131,7 +130,6 @@ class LabelsMapper(object):
                 }
 
         return self._milestones
-
 
     def args_for(self, card_data):
         ret = {}
@@ -225,7 +223,7 @@ class Card(object):
             self.card_data['url'],
             self.card_data['desc']
         )
-        if self.card_data['closed'] == True:
+        if self.card_data['closed']:
             state['state'] = 'closed'
 
         state = dict(
@@ -337,10 +335,10 @@ def main():
                 label_req = gh_request(
                     'repos/%s/%s/labels' % (args.github_owner,
                                             args.github_repo),
-                     args,
-                     data={'name': label_name,
-                           'color': LABEL_COLORS[label_color]
-                           },
+                    args,
+                    data={'name': label_name,
+                          'color': LABEL_COLORS[label_color]
+                          },
                 )
                 if not label_req:
                     logging.error("label creation failed")
