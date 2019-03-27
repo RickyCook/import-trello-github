@@ -226,7 +226,7 @@ class Card(object):
             self.card_data['desc']
         )
         if self.card_data['closed'] == True:
-            state['state'] = 'closed' 
+            state['state'] = 'closed'
 
         state = dict(
             list(state.items()) +
@@ -368,7 +368,7 @@ def main():
             for list in trello_data['lists']
             if list['id'] == card_data["idList"]
         ))
-        
+
         if not labels_mapper.lists.get(list_name):
             logging.warn("List {0}, not defined, skipping card".format(list_name))
             continue
