@@ -4,6 +4,7 @@ import json
 import logging
 import sys
 
+import dateparser
 import py.path
 import requests
 
@@ -184,11 +185,13 @@ class LabelsMapper(object):
 
 
 class Card(object):
-    def __init__(self, card_data, args, labels_mapper):
+    def __init__(self, card_data, args, labels_mapper, comments, tasks):
         self.card_data = card_data
         self.state_file = None
         self.args = args
         self.labels_mapper = labels_mapper
+        self.comments = comments
+        self.tasks = tasks
 
         if args.statedir:
             self.state_file = args.statedir.join('%s.json' % card_data['id'])
@@ -219,9 +222,11 @@ class Card(object):
             state = {}
 
         state['title'] = self.card_data['name']
-        state['body'] = "%s\n\n%s" % (
+        state['body'] = "%s\n\n%s\n\n%s\n\n%s" % (
             self.card_data['url'],
-            self.card_data['desc']
+            self.card_data['desc'],
+            self.tasks,
+            self.comments
         )
         if self.card_data['closed']:
             state['state'] = 'closed'
@@ -357,9 +362,54 @@ def main():
     )
     labels_mapper = LabelsMapper(trello_data, args)
 
+    extraCardData = {}
+    for comment_data in trello_data['actions']:
+        if comment_data['type'] != 'commentCard':
+            continue
+
+        date = dateparser.parse(comment_data['date'])
+        card = comment_data['data']['card']['id']
+        text = comment_data['memberCreator']['username'] + ": " + comment_data['data']['text']
+
+        if card not in extraCardData:
+            extraCardData[card] = {}
+            extraCardData[card]['comments'] = {}
+
+        extraCardData[card]['comments'][date.timestamp()] = text
+
+    for task_data in trello_data['checklists']:
+        card = task_data['idCard']
+        tasks = task_data['checkItems']
+
+        text = ""
+        for task in tasks:
+            if task['state'] == 'complete':
+                text += "- [x] " + task['name'] + "\n"
+            else:
+                text += "- [ ] " + task['name'] + "\n"
+
+        if card not in extraCardData:
+            extraCardData[card] = {}
+
+        extraCardData[card]['tasks'] = text
+
     for card_data in trello_data['cards']:
         cards_log.debug("Card %s", card_data['name'])
-        card = Card(card_data, args, labels_mapper)
+
+        to_add_comment_data = ""
+        to_add_task_data = ""
+        if card_data['id'] in extraCardData:
+            if 'tasks' in extraCardData[card_data['id']]:
+                to_add_task_data = extraCardData[card_data['id']]['tasks']
+            if 'comments' in extraCardData[card_data['id']]:
+                to_add_comment_data += "------- COMMENTS ---------\n"
+                for comment_key in sorted(extraCardData[card_data['id']]['comments'].keys()):
+                    to_add_comment_data += extraCardData[card_data['id']]['comments'][comment_key]
+                    to_add_comment_data += "\n"
+                    to_add_comment_data += "-----------------------------------------"
+                    to_add_comment_data += "\n"
+
+        card = Card(card_data, args, labels_mapper, to_add_comment_data, to_add_task_data)
 
         list_name = next((
             list['name']
