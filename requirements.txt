@@ -1,2 +1,2 @@
 py==1.4.26
-requests==2.5.3
+requests==2.20.0
